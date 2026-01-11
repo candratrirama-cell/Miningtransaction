@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kasir Cloud - Mining Coffee</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <style>
+        body { background-color: #f8fafc; }
+        .menu-card:active { transform: scale(0.95); transition: 0.1s; }
+        .loading-overlay { position: fixed; inset: 0; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
+        .custom-shadow { box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.07); }
+    </style>
+</head>
+<body class="pb-10">
+
+    <div id="loader" class="loading-overlay">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+        <p class="text-gray-500 font-medium">Menghubungkan ke Cloud PT Bangga Karya...</p>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-4 pt-6">
+        <header class="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-black text-gray-900 tracking-tight">MINING COFFEE ☕</h1>
+                <p class="text-gray-500 font-medium">PT Bangga Karya Indonesia</p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="exportData()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-black transition">Download Laporan (.CSV)</button>
+                <button onclick="clearAllData()" class="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-100 transition border border-red-200">Reset Data</button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white p-5 rounded-2xl custom-shadow border-t-4 border-blue-500">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Omzet Hari Ini</p>
+                <p id="today-revenue" class="text-xl font-black text-gray-800">Rp 0</p>
+            </div>
+            <div class="bg-white p-5 rounded-2xl custom-shadow border-t-4 border-green-500">
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Laba Hari Ini</p>
+                <p id="today-profit" class="text-xl font-black text-green-600">Rp 0</p>
+            </div>
+            <div class="bg-white p-5 rounded-2xl custom-shadow border-t-4 border-purple-500">
+                <p id="month-label" class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Omzet Bulan Ini</p>
+                <p id="month-revenue" class="text-xl font-black text-gray-800">Rp 0</p>
+            </div>
+            <div class="bg-white p-5 rounded-2xl custom-shadow border-t-4 border-orange-500">
+                <p id="month-label-laba" class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Laba Bulan Ini</p>
+                <p id="month-profit" class="text-xl font-black text-orange-600">Rp 0</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2">
+                <h2 class="text-xl font-bold mb-5 text-gray-800 flex items-center">
+                    <span class="bg-blue-600 w-2 h-7 rounded-full mr-3"></span>
+                    Menu Kasir
+                </h2>
+                <div id="menu-container" class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-3xl custom-shadow border border-gray-100">
+                <h2 class="text-xl font-bold mb-5 text-gray-800 border-b pb-4">Terjual Hari Ini</h2>
+                <div id="sales-list" class="space-y-3 min-h-[200px]">
+                    </div>
+                <div class="mt-6 pt-4 border-t border-dashed">
+                    <p class="text-[10px] text-center text-gray-400 uppercase font-bold tracking-[0.2em]">Data Realtime Firebase</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. KONFIGURASI FIREBASE (ISI DI SINI)
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAElBpBUj78ii_t-AKSfGr2FwKIKdC3PUs",
+            authDomain: "miningtransaksi.firebaseapp.com",
+            databaseURL: "https://miningtransaksi-default-rtdb.asia-southeast1.firebasedatabase.app/",
+            projectId: "miningtransaksi",
+            storageBucket: "miningtransaksi.firebasestorage.app",
+            messagingSenderId: "891158052466",
+            appId: "1:891158052466:web:562d2cc72d2f741d23cceb"
+        };
+
+        // Inisialisasi Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // ==========================================
+        // 2. DATA PRODUK
+        // ==========================================
+        const products = [
+            { id: 1, name: "Americano", hj: 7000, laba: 3600 },
+            { id: 2, name: "Mining Kopi Susu", hj: 8000, laba: 2100 },
+            { id: 3, name: "Kopi Susu Gula Aren", hj: 12000, laba: 4600 },
+            { id: 4, name: "Kopi Susu Pandan", hj: 12000, laba: 4100 },
+            { id: 5, name: "Caramel Latte", hj: 13000, laba: 5100 },
+            { id: 6, name: "Matcha / Chocolate", hj: 10000, laba: 3200 },
+            { id: 7, name: "Mining Milo", hj: 10000, laba: 3200 }
+        ];
+
+        // ==========================================
+        // 3. LOGIKA APLIKASI
+        // ==========================================
+
+        function initMenu() {
+            const container = document.getElementById('menu-container');
+            products.forEach(p => {
+                const btn = document.createElement('button');
+                btn.className = "menu-card bg-white p-5 rounded-2xl custom-shadow border border-gray-100 flex flex-col items-start hover:border-blue-400 transition cursor-pointer";
+                btn.onclick = () => addSale(p);
+                btn.innerHTML = `
+                    <span class="text-xs font-bold text-blue-500 uppercase mb-1">☕ Coffee</span>
+                    <span class="font-black text-gray-800 leading-tight mb-2 h-10 overflow-hidden">${p.name}</span>
+                    <span class="bg-blue-50 text-blue-700 px-3 py-1 rounded-lg font-bold text-sm italic">Rp ${p.hj.toLocaleString()}</span>
+                `;
+                container.appendChild(btn);
+            });
+        }
+
+        function addSale(product) {
+            const now = new Date();
+            const saleData = {
+                name: product.name,
+                hj: product.hj,
+                laba: product.laba,
+                timestamp: now.getTime(),
+                dateStr: now.toLocaleDateString('en-CA'), // Format YYYY-MM-DD
+                monthStr: (now.getMonth() + 1) + "-" + now.getFullYear()
+            };
+            db.ref('sales').push(saleData);
+        }
+
+        function deleteLastSale(productName) {
+            if(confirm(`Batalkan 1 penjualan ${productName}?`)) {
+                db.ref('sales').orderByChild('name').equalTo(productName).limitToLast(1).once('value', snapshot => {
+                    snapshot.forEach(child => child.ref.remove());
+                });
+            }
+        }
+
+        function clearAllData() {
+            const pass = prompt("Masukkan Password Admin (PT BKI):");
+            if(pass === "ADMIN") {
+                if(confirm("Hapus seluruh history penjualan?")) {
+                    db.ref('sales').remove();
+                }
+            } else { alert("Akses Ditolak!"); }
+        }
+
+        // Sinkronisasi Realtime
+        db.ref('sales').on('value', snapshot => {
+            document.getElementById('loader').style.display = 'none';
+            const data = snapshot.val() ? Object.values(snapshot.val()) : [];
+            updateUI(data);
+        });
+
+        function updateUI(sales) {
+            const now = new Date();
+            const today = now.toLocaleDateString('en-CA');
+            const thisMonth = (now.getMonth() + 1) + "-" + now.getFullYear();
+
+            let tRev = 0, tLaba = 0, mRev = 0, mLaba = 0;
+            let summary = {};
+
+            sales.forEach(s => {
+                if(s.monthStr === thisMonth) { mRev += s.hj; mLaba += s.laba; }
+                if(s.dateStr === today) {
+                    tRev += s.hj; 
+                    tLaba += s.laba;
+                    summary[s.name] = (summary[s.name] || 0) + 1;
+                }
+            });
+
+            document.getElementById('today-revenue').innerText = `Rp ${tRev.toLocaleString()}`;
+            document.getElementById('today-profit').innerText = `Rp ${tLaba.toLocaleString()}`;
+            document.getElementById('month-revenue').innerText = `Rp ${mRev.toLocaleString()}`;
+            document.getElementById('month-profit').innerText = `Rp ${mLaba.toLocaleString()}`;
+
+            const listContainer = document.getElementById('sales-list');
+            const items = Object.entries(summary).map(([name, qty]) => `
+                <div class="flex justify-between items-center bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                    <div>
+                        <p class="font-bold text-gray-800 text-sm">${name}</p>
+                        <p class="text-xs text-blue-600 font-bold">${qty} Terjual</p>
+                    </div>
+                    <button onclick="deleteLastSale('${name}')" class="text-red-400 hover:text-red-600 p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+            
+            listContainer.innerHTML = items || '<div class="text-center py-10"><p class="text-gray-400 text-sm italic">Belum ada order hari ini.</p></div>';
+        }
+
+        function exportData() {
+            db.ref('sales').once('value', snapshot => {
+                const data = snapshot.val();
+                if(!data) return alert("Tidak ada data untuk diunduh");
+                let csv = "Nama Produk,Harga Jual,Laba,Tanggal\n";
+                Object.values(data).forEach(s => {
+                    csv += `${s.name},${s.hj},${s.laba},${s.dateStr}\n`;
+                });
+                const blob = new Blob([csv], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Laporan_Mining_Coffee_${new Date().toLocaleDateString()}.csv`;
+                a.click();
+            });
+        }
+
+        initMenu();
+    </script>
+</body>
+</html>
