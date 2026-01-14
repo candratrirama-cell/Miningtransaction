@@ -3,80 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kasir Cloud - Mining Coffee</title>
+    <title>Mining Coffee - Cloud System</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
     <style>
-        body { background-color: #f8fafc; }
-        .menu-card:active { transform: scale(0.95); transition: 0.1s; }
-        .loading-overlay { position: fixed; inset: 0; background: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
-        .custom-shadow { box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.07); }
+        body { background-color: #f1f5f9; font-family: 'Inter', sans-serif; }
+        .menu-card { transition: all 0.2s ease; cursor: pointer; border: 1px solid #e2e8f0; }
+        .menu-card:active { transform: scale(0.95); background-color: #eff6ff; }
+        .stats-card { background: white; border-radius: 1rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
     </style>
 </head>
 <body class="pb-10">
 
-    <div id="loader" class="loading-overlay">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <p class="text-gray-500 font-medium">Menghubungkan ke Cloud PT Bangga Karya...</p>
+    <div id="paymentModal" class="modal">
+        <div class="bg-white p-8 rounded-3xl shadow-2xl max-w-sm w-full mx-4 border border-gray-100">
+            <h3 class="text-xl font-black text-center mb-2 uppercase italic tracking-tighter text-gray-800">Metode Bayar</h3>
+            <p id="selectedItemName" class="text-center text-blue-600 font-bold mb-6 italic text-sm"></p>
+            <div class="grid grid-cols-1 gap-4">
+                <button onclick="confirmSale('CASH')" class="bg-green-500 text-white py-4 rounded-2xl font-black text-lg hover:bg-green-600 shadow-lg shadow-green-100 transition">💵 CASH</button>
+                <button onclick="confirmSale('QRIS')" class="bg-blue-600 text-white py-4 rounded-2xl font-black text-lg hover:bg-blue-700 shadow-lg shadow-blue-100 transition">📱 QRIS</button>
+                <button onclick="closeModal()" class="mt-2 text-gray-400 font-bold text-xs tracking-widest uppercase">Batal</button>
+            </div>
+        </div>
     </div>
 
-    <div class="max-w-6xl mx-auto px-4 pt-6">
-        <header class="flex flex-col md:flex-row md:justify-between md:items-center mb-8 gap-4">
+    <div id="loader" class="fixed inset-0 bg-white flex flex-col items-center justify-center z-50">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mb-4"></div>
+        <p class="text-gray-500 font-bold italic tracking-widest uppercase text-xs text-center">Mining Coffee Cloud<br>PT Bangga Karya Indonesia</p>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-4 pt-8">
+        <header class="flex flex-col md:flex-row md:justify-between md:items-end mb-8 gap-4">
             <div>
-                <h1 class="text-3xl font-black text-gray-900 tracking-tight">MINING COFFEE ☕</h1>
-                <p class="text-gray-500 font-medium">PT Bangga Karya Indonesia</p>
+                <h1 class="text-4xl font-black text-gray-900 italic tracking-tighter uppercase">Mining Coffee</h1>
+                <p class="text-blue-600 font-bold text-[10px] tracking-[0.4em] uppercase">PT Bangga Karya Indonesia</p>
             </div>
-            <div class="flex gap-2">
-                <button onclick="exportData()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-black transition">Download Laporan (.CSV)</button>
-                <button onclick="clearAllData()" class="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-100 transition border border-red-200">Reset Data</button>
+            <div class="flex flex-wrap gap-2">
+                <input type="file" id="csvInput" accept=".csv" class="hidden">
+                <button onclick="document.getElementById('csvInput').click()" class="bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-xl text-[10px] font-black hover:bg-gray-50 transition uppercase">Upload Data</button>
+                <button id="btnExport" class="bg-gray-800 text-white px-4 py-2 rounded-xl text-[10px] font-black hover:bg-black transition uppercase">Export (.CSV)</button>
+                <button id="btnReset" class="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-[10px] font-black border border-red-100 uppercase">Reset</button>
             </div>
         </header>
 
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div class="bg-white p-5 rounded-2xl custom-shadow border-t-4 border-blue-500">
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Omzet Hari Ini</p>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10 text-center md:text-left">
+            <div class="stats-card p-5 border-l-4 border-blue-500">
+                <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Omzet Hari Ini</p>
                 <p id="today-revenue" class="text-xl font-black text-gray-800">Rp 0</p>
             </div>
-            <div class="bg-white p-5 rounded-2xl custom-shadow border-t-4 border-green-500">
-                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Laba Hari Ini</p>
+            <div class="stats-card p-5 border-l-4 border-green-500">
+                <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Laba Hari Ini</p>
                 <p id="today-profit" class="text-xl font-black text-green-600">Rp 0</p>
             </div>
-            <div class="bg-white p-5 rounded-2xl custom-shadow border-t-4 border-purple-500">
-                <p id="month-label" class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Omzet Bulan Ini</p>
+            <div class="stats-card p-5 border-l-4 border-purple-600">
+                <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Omzet Bulan Ini</p>
                 <p id="month-revenue" class="text-xl font-black text-gray-800">Rp 0</p>
             </div>
-            <div class="bg-white p-5 rounded-2xl custom-shadow border-t-4 border-orange-500">
-                <p id="month-label-laba" class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Laba Bulan Ini</p>
+            <div class="stats-card p-5 border-l-4 border-orange-500">
+                <p class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Laba Bulan Ini</p>
                 <p id="month-profit" class="text-xl font-black text-orange-600">Rp 0</p>
             </div>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div class="lg:col-span-2">
-                <h2 class="text-xl font-bold mb-5 text-gray-800 flex items-center">
-                    <span class="bg-blue-600 w-2 h-7 rounded-full mr-3"></span>
-                    Menu Kasir
+                <h2 class="text-xl font-black mb-6 text-gray-800 flex items-center italic uppercase tracking-tighter">
+                    <span class="bg-blue-600 w-3 h-3 rounded-full mr-3"></span> Daftar Menu
                 </h2>
-                <div id="menu-container" class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    </div>
+                <div id="menu-container" class="grid grid-cols-2 sm:grid-cols-3 gap-4"></div>
             </div>
 
-            <div class="bg-white p-6 rounded-3xl custom-shadow border border-gray-100">
-                <h2 class="text-xl font-bold mb-5 text-gray-800 border-b pb-4">Terjual Hari Ini</h2>
-                <div id="sales-list" class="space-y-3 min-h-[200px]">
-                    </div>
-                <div class="mt-6 pt-4 border-t border-dashed">
-                    <p class="text-[10px] text-center text-gray-400 uppercase font-bold tracking-[0.2em]">Data Realtime Firebase</p>
-                </div>
+            <div class="bg-white p-6 rounded-3xl shadow-xl h-fit sticky top-6">
+                <h2 class="text-lg font-black mb-6 text-gray-800 border-b pb-4 uppercase italic">Ringkasan Hari Ini</h2>
+                <div id="sales-list" class="space-y-3 min-h-[200px]"></div>
             </div>
         </div>
     </div>
 
-    <script>
-        // ==========================================
-        // 1. KONFIGURASI FIREBASE (ISI DI SINI)
-        // ==========================================
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, push, onValue, remove, query, orderByChild, equalTo, limitToLast, get } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
         const firebaseConfig = {
             apiKey: "AIzaSyAElBpBUj78ii_t-AKSfGr2FwKIKdC3PUs",
             authDomain: "miningtransaksi.firebaseapp.com",
@@ -87,93 +94,98 @@
             appId: "1:891158052466:web:562d2cc72d2f741d23cceb"
         };
 
-        // Inisialisasi Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
 
-        // ==========================================
-        // 2. DATA PRODUK
-        // ==========================================
+        // DATA MENU LENGKAP DENGAN HPP & LABA
         const products = [
-            { id: 1, name: "Americano", hj: 7000, laba: 3600 },
-            { id: 2, name: "Mining Kopi Susu", hj: 8000, laba: 2100 },
-            { id: 3, name: "Kopi Susu Gula Aren", hj: 12000, laba: 4600 },
-            { id: 4, name: "Kopi Susu Pandan", hj: 12000, laba: 4100 },
-            { id: 5, name: "Caramel Latte", hj: 13000, laba: 5100 },
-            { id: 6, name: "Matcha / Chocolate", hj: 10000, laba: 3200 },
-            { id: 7, name: "Mining Milo", hj: 10000, laba: 3200 }
+            { id: 1, name: "Americano", hj: 7000, hpp: 4700, laba: 2300 },
+            { id: 2, name: "Mining Kopi Susu", hj: 8000, hpp: 5900, laba: 2100 },
+            { id: 3, name: "Kopi Susu Gula Aren", hj: 12000, hpp: 7400, laba: 4600 },
+            { id: 4, name: "Kopi Susu Pandan", hj: 12000, hpp: 7900, laba: 4100 },
+            { id: 5, name: "Caramel Latte", hj: 13000, hpp: 7900, laba: 5100 },
+            { id: 6, name: "Matcha / Chocolate", hj: 10000, hpp: 6400, laba: 3600 },
+            { id: 7, name: "Mining Milo", hj: 10000, hpp: 6800, laba: 3200 }
         ];
 
-        // ==========================================
-        // 3. LOGIKA APLIKASI
-        // ==========================================
-
-        function initMenu() {
-            const container = document.getElementById('menu-container');
-            products.forEach(p => {
-                const btn = document.createElement('button');
-                btn.className = "menu-card bg-white p-5 rounded-2xl custom-shadow border border-gray-100 flex flex-col items-start hover:border-blue-400 transition cursor-pointer";
-                btn.onclick = () => addSale(p);
-                btn.innerHTML = `
-                    <span class="text-xs font-bold text-blue-500 uppercase mb-1">☕ Coffee</span>
-                    <span class="font-black text-gray-800 leading-tight mb-2 h-10 overflow-hidden">${p.name}</span>
-                    <span class="bg-blue-50 text-blue-700 px-3 py-1 rounded-lg font-bold text-sm italic">Rp ${p.hj.toLocaleString()}</span>
-                `;
-                container.appendChild(btn);
-            });
-        }
-
-        function addSale(product) {
+        let pendingProduct = null;
+        window.openModal = (p) => { pendingProduct = p; document.getElementById('selectedItemName').innerText = p.name; document.getElementById('paymentModal').style.display = 'flex'; };
+        window.closeModal = () => { document.getElementById('paymentModal').style.display = 'none'; pendingProduct = null; };
+        
+        window.confirmSale = (method) => {
+            if (!pendingProduct) return;
             const now = new Date();
-            const saleData = {
-                name: product.name,
-                hj: product.hj,
-                laba: product.laba,
-                timestamp: now.getTime(),
-                dateStr: now.toLocaleDateString('en-CA'), // Format YYYY-MM-DD
-                monthStr: (now.getMonth() + 1) + "-" + now.getFullYear()
-            };
-            db.ref('sales').push(saleData);
-        }
+            push(ref(db, 'sales'), {
+                name: pendingProduct.name,
+                hj: pendingProduct.hj,
+                hpp: pendingProduct.hpp,
+                laba: pendingProduct.laba,
+                payment: method,
+                dateStr: now.toLocaleDateString('en-CA'),
+                monthStr: `${now.getMonth() + 1}-${now.getFullYear()}`,
+                timestamp: now.getTime()
+            });
+            closeModal();
+        };
 
-        function deleteLastSale(productName) {
-            if(confirm(`Batalkan 1 penjualan ${productName}?`)) {
-                db.ref('sales').orderByChild('name').equalTo(productName).limitToLast(1).once('value', snapshot => {
-                    snapshot.forEach(child => child.ref.remove());
-                });
-            }
-        }
-
-        function clearAllData() {
-            const pass = prompt("Masukkan Password Admin (PT BKI):");
-            if(pass === "ADMIN") {
-                if(confirm("Hapus seluruh history penjualan?")) {
-                    db.ref('sales').remove();
-                }
-            } else { alert("Akses Ditolak!"); }
-        }
-
-        // Sinkronisasi Realtime
-        db.ref('sales').on('value', snapshot => {
-            document.getElementById('loader').style.display = 'none';
-            const data = snapshot.val() ? Object.values(snapshot.val()) : [];
-            updateUI(data);
+        const menuContainer = document.getElementById('menu-container');
+        products.forEach(p => {
+            const btn = document.createElement('div');
+            btn.className = "menu-card bg-white p-5 rounded-2xl shadow-sm flex flex-col items-start border-gray-100 border";
+            btn.innerHTML = `
+                <span class="text-[9px] font-black text-blue-500 uppercase mb-1 tracking-widest">Mining Coffee</span>
+                <span class="font-bold text-gray-800 text-sm leading-tight mb-3 h-8">${p.name}</span>
+                <span class="text-[10px] font-black text-gray-900 bg-gray-50 px-2 py-1 rounded italic border border-gray-200">Rp ${p.hj.toLocaleString()}</span>
+            `;
+            btn.onclick = () => openModal(p);
+            menuContainer.appendChild(btn);
         });
 
-        function updateUI(sales) {
+        // IMPORT CSV LOGIC
+        document.getElementById('csvInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const text = event.target.result;
+                const rows = text.split('\n').slice(1);
+                let count = 0;
+                rows.forEach(row => {
+                    const cols = row.split(',');
+                    if(cols.length >= 5) {
+                        push(ref(db, 'sales'), {
+                            name: cols[0].replace(/"/g, ''),
+                            payment: cols[1].replace(/"/g, '') || "CASH",
+                            hj: parseInt(cols[2]) || 0,
+                            hpp: parseInt(cols[3]) || 0,
+                            laba: parseInt(cols[4]) || 0,
+                            dateStr: cols[5] ? cols[5].trim() : new Date().toLocaleDateString('en-CA'),
+                            monthStr: cols[5] ? `${new Date(cols[5]).getMonth()+1}-${new Date(cols[5]).getFullYear()}` : "1-2026",
+                            timestamp: new Date().getTime()
+                        });
+                        count++;
+                    }
+                });
+                alert(`Berhasil mengunggah ${count} data!`);
+            };
+            reader.readAsText(file);
+        });
+
+        // SYNC REALTIME
+        onValue(ref(db, 'sales'), (snapshot) => {
+            document.getElementById('loader').style.display = 'none';
+            const data = snapshot.val() ? Object.values(snapshot.val()) : [];
             const now = new Date();
             const today = now.toLocaleDateString('en-CA');
-            const thisMonth = (now.getMonth() + 1) + "-" + now.getFullYear();
-
+            const thisMonth = `${now.getMonth() + 1}-${now.getFullYear()}`;
             let tRev = 0, tLaba = 0, mRev = 0, mLaba = 0;
             let summary = {};
 
-            sales.forEach(s => {
-                if(s.monthStr === thisMonth) { mRev += s.hj; mLaba += s.laba; }
+            data.forEach(s => {
+                if(s.monthStr === thisMonth) { mRev += s.hj; mLaba += (s.laba || 0); }
                 if(s.dateStr === today) {
-                    tRev += s.hj; 
-                    tLaba += s.laba;
-                    summary[s.name] = (summary[s.name] || 0) + 1;
+                    tRev += s.hj; tLaba += (s.laba || 0);
+                    const key = `${s.name} (${s.payment})`;
+                    summary[key] = (summary[key] || 0) + 1;
                 }
             });
 
@@ -182,42 +194,47 @@
             document.getElementById('month-revenue').innerText = `Rp ${mRev.toLocaleString()}`;
             document.getElementById('month-profit').innerText = `Rp ${mLaba.toLocaleString()}`;
 
-            const listContainer = document.getElementById('sales-list');
-            const items = Object.entries(summary).map(([name, qty]) => `
-                <div class="flex justify-between items-center bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                    <div>
-                        <p class="font-bold text-gray-800 text-sm">${name}</p>
-                        <p class="text-xs text-blue-600 font-bold">${qty} Terjual</p>
+            const listHtml = Object.entries(summary).map(([key, qty]) => `
+                <div class="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+                    <div class="flex flex-col">
+                        <span class="font-bold text-gray-800 text-xs">${key.split(' (')[0]}</span>
+                        <span class="text-[9px] font-black ${key.includes('CASH') ? 'text-green-500' : 'text-blue-500'} italic uppercase">${key.includes('CASH') ? '💵 CASH' : '📱 QRIS'}</span>
                     </div>
-                    <button onclick="deleteLastSale('${name}')" class="text-red-400 hover:text-red-600 p-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <span class="bg-gray-800 text-white px-3 py-1 rounded-lg font-black text-[10px]">x${qty}</span>
+                        <button class="btnDelete text-red-300 hover:text-red-500" data-name-payment="${key}">
+                            <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"/></svg>
+                        </button>
+                    </div>
                 </div>
             `).join('');
-            
-            listContainer.innerHTML = items || '<div class="text-center py-10"><p class="text-gray-400 text-sm italic">Belum ada order hari ini.</p></div>';
-        }
+            document.getElementById('sales-list').innerHTML = listHtml || '<p class="text-center text-gray-300 py-10 italic text-[10px] uppercase font-bold tracking-widest">Kosong</p>';
 
-        function exportData() {
-            db.ref('sales').once('value', snapshot => {
-                const data = snapshot.val();
-                if(!data) return alert("Tidak ada data untuk diunduh");
-                let csv = "Nama Produk,Harga Jual,Laba,Tanggal\n";
-                Object.values(data).forEach(s => {
-                    csv += `${s.name},${s.hj},${s.laba},${s.dateStr}\n`;
-                });
-                const blob = new Blob([csv], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Laporan_Mining_Coffee_${new Date().toLocaleDateString()}.csv`;
-                a.click();
+            document.querySelectorAll('.btnDelete').forEach(btn => {
+                btn.onclick = () => {
+                    const fullKey = btn.getAttribute('data-name-payment');
+                    const name = fullKey.split(' (')[0];
+                    const method = fullKey.includes('CASH') ? 'CASH' : 'QRIS';
+                    const q = query(ref(db, 'sales'), orderByChild('name'), equalTo(name), limitToLast(20));
+                    get(q).then(snap => {
+                        let del = false; snap.forEach(c => { if(!del && c.val().payment === method && c.val().dateStr === today) { remove(c.ref); del = true; } });
+                    });
+                };
             });
-        }
+        });
 
-        initMenu();
+        document.getElementById('btnExport').onclick = () => {
+            get(ref(db, 'sales')).then(snap => {
+                const data = snap.val(); if(!data) return alert("Data Kosong");
+                let csv = "Produk,Metode,Harga Jual,HPP,Laba,Tanggal\n" + Object.values(data).map(s => `"${s.name}","${s.payment}",${s.hj},${s.hpp || 0},${s.laba || 0},${s.dateStr}`).join("\n");
+                const blob = new Blob([csv], {type: 'text/csv'});
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Laporan_MiningCoffee.csv`; a.click();
+            });
+        };
+
+        document.getElementById('btnReset').onclick = () => {
+            if(prompt("Password Admin PT BKI:") === "ADMIN") { if(confirm("Hapus semua data?")) remove(ref(db, 'sales')); }
+        };
     </script>
 </body>
 </html>
